@@ -14,7 +14,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: root-project/llvm-project
-          path: llvm
+          path: llvm-project
           ref: cling-latest
           fetch-depth: 1
 
@@ -25,25 +25,36 @@ jobs:
           path: cling
           fetch-depth: 1
 
-      - name: Prepare build directory
-        run: mkdir build
-
-      - name: Configure
-        working-directory: build
+      - name: Build Cling
         shell: pwsh
-        run: cmake -S ../llvm/llvm -B . -DLLVM_EXTERNAL_PROJECTS=cling -DLLVM_EXTERNAL_CLING_SOURCE_DIR=../cling -DLLVM_ENABLE_PROJECTS="clang" -DLLVM_TARGETS_TO_BUILD="host;NVPTX" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLLVM_ENABLE_ASSERTIONS=ON
+        run: |
+          $env:ncpus = $([Environment]::ProcessorCount)
+          $env:PWD_DIR = $PWD.Path
+          $env:CLING_DIR = "$env:PWD_DIR\cling"
 
-      - name: Build
-        working-directory: build
-        run: cmake --build . --config RelWithDebInfo --parallel 4 --target cling
+          New-Item -ItemType Directory -Force -Path llvm-project\build | Out-Null
+          Set-Location llvm-project\build
+
+          cmake -DLLVM_ENABLE_PROJECTS=clang `
+                -DLLVM_EXTERNAL_PROJECTS=cling `
+                -DLLVM_EXTERNAL_CLING_SOURCE_DIR="$env:CLING_DIR" `
+                -DLLVM_TARGETS_TO_BUILD="host;NVPTX" `
+                -DCMAKE_BUILD_TYPE=RelWithDebInfo `
+                -DLLVM_ENABLE_ASSERTIONS=ON `
+                ../llvm
+
+          cmake --build . --target clang --parallel $env:ncpus
+          cmake --build . --target cling --parallel $env:ncpus
 
       # - name: Test
       #   working-directory: build
       #   run: cmake --build . --config RelWithDebInfo --target check-cling
 
       - name: Install
-        working-directory: build
-        run: cmake --install . --prefix ../install --config RelWithDebInfo
+        shell: pwsh
+        run: |
+          $env:PWD_DIR = $PWD.Path
+          cmake --install "$env:PWD_DIR\llvm-project\build" --prefix "$env:PWD_DIR\install" --config RelWithDebInfo
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
