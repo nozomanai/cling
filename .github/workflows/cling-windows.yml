@@ -53,8 +53,8 @@ jobs:
       - name: Install
         shell: pwsh
         run: |
-          $env:PWD_DIR = $PWD.Path
-          cmake --install "$env:PWD_DIR\llvm-project\build" --prefix "$env:PWD_DIR\install" --config RelWithDebInfo
+          Set-Location llvm-project\build
+          cmake --build . --target install --config RelWithDebInfo -- /p:InstallPath="$env:PWD_DIR\install"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
